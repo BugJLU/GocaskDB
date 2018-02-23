@@ -1,6 +1,9 @@
 # Test DB
 testdb/*
 
+# Compiled Files
+pkg/*
+
 # Useless Files
 *.txt
 *.json
