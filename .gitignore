@@ -4,3 +4,4 @@ testdb/*
 # Useless Files
 *.txt
 *.json
+.idea/
