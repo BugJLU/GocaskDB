@@ -1,0 +1,6 @@
+# Test DB
+testdb/*
+
+# Useless Files
+*.txt
+*.json
