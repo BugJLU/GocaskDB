@@ -132,7 +132,7 @@ func OpenReadDBFile(filename string) (*os.File, error) {
 	return nil, nil
 }
 
-func WriteData(data *DataPacket, db *DB) error {
+func WriteData(data *DataPacket, db *DB) (body *hashBody, errr error) {
 	databytes := data.getBytes()	//	crc	| tstmp	|  ksz	|  vsz	|  key	|  val
 	var b1, b2 []byte
 
@@ -143,14 +143,14 @@ func WriteData(data *DataPacket, db *DB) error {
 	}
 	_, err := db.activeDBFile.Write(b1)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	// write hint file
 	// I haven't found a function in go like ftell() in c, so Size is used here instead...
 	info, err := db.activeDBFile.Stat();
 	if err != nil {
-		return err
+		return nil, err
 	}
 	vpos := int32(info.Size()) - int32(binary.LittleEndian.Uint32(databytes[3])) // valpos = size(or file pointer position) - valsize
 	b2 = append(b2, databytes[1]...)	// tstmp
@@ -160,17 +160,23 @@ func WriteData(data *DataPacket, db *DB) error {
 	b2 = append(b2, databytes[4]...)	// key
 	_, err = db.activeHintFile.Write(b2)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	// write hash table
-	//TODO:
+
+	// Set hash body.
+	hbody := new(hashBody)
+	hbody.vpos = vpos
+	hbody.vsz = data.vsz
+	hbody.timestamp = data.timestamp
+	//hbody.file =
+
 
 	/* 	If the size of active DB file >= file_max,
 	 *	turn to new active Hint and DB files.
 	*/
 	stat, err := os.Stat(db.activeDBFile.Name())
 	if err != nil {
-		return err
+		return nil, err
 	}
 		//fmt.Println(db.activeDBFile.Name())
 		//fmt.Println(stat.Size())
@@ -184,7 +190,7 @@ func WriteData(data *DataPacket, db *DB) error {
 			}
 		}()
 	}
-	return nil
+	return hbody, nil
 }
 
 func NewActFiles(db *DB) error {

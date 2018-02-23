@@ -29,7 +29,8 @@ func main() {
 
 	t1 := util.UnixNano()
 	for i := 0; i < 100000; i++ {
-		db.Set("asd123jkl0", "asdfgzxcvnuedjszqiklwerxsqi175'[z056=`z/eklzr42naz")
+		//db.Set("asd123jkl0", "asdfgzxcvnuedjszqiklwerxsqi175'[z056=`z/eklzr42naz")
+		db.Delete("asd123jkl0")
 	}
 	t2 := util.UnixNano()
 

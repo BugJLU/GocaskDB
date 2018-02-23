@@ -26,8 +26,8 @@ type DataPacket struct {
 	timestamp int64
 	ksz       int32
 	vsz       int32
-	key       string
-	value     string
+	key       Key
+	value     Value
 }
 
 // Convert data into packet.
@@ -37,8 +37,8 @@ func wrap(key Key, value Value, del bool) *DataPacket {
 		util.UnixNano(),
 		util.Sizeof(string(key)),
 		util.Sizeof(string(value)),
-		string(key),
-		string(value)}
+		key,
+		value}
 	if del {
 		datapkt.vsz = -1
 	}
@@ -63,9 +63,9 @@ func bytesToData(bytes []byte) *DataPacket {
 	b, bytes = bytes[:4], bytes[4:]
 	data.vsz = int32(binary.LittleEndian.Uint32(b))
 	b, bytes = bytes[:data.ksz], bytes[data.ksz:]
-	data.key = string(b)
+	data.key = Key(b)
 	b, bytes = bytes[:data.vsz], bytes[data.vsz:]
-	data.value = string(b)
+	data.value = Value(b)
 	// TODO: check length of the raw bytes
 	return data
 }

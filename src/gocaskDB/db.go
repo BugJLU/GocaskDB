@@ -31,12 +31,12 @@ type DB struct {
 	dbFiles []*os.File	// All db files.
 	dbPath string // Directory of db.
 	dbinfo *DBinfo
-	hashtable map[Key]hashBody
+	hashtable map[Key]*hashBody
 	open bool
 }
 
 type DBOptions struct {
-	file_max int32	// 10MB by default
+	file_max int32	// 10MB by default, no more than 2GB
 	key_max int32	// 1KB by default
 	val_max int32	// 65536B by default
 
@@ -46,6 +46,8 @@ var defaultOptions = DBOptions{ 10<<20, 1<<10, 1<<16 }
 
 type Key string;
 type Value string;
+
+// unused
 type Record struct {
 	key Key;
 	value Value
@@ -63,7 +65,7 @@ func (db *DB) OpenWithOptions(filename string, options DBOptions) error {
 	db.rwlock = new(sync.RWMutex)
 	db.dealingLock = new(sync.Mutex)
 	db.dbPath = filepath.Dir(filename)
-	//fmt.Println(db.dbPath)
+	//db.hashtable = make(map[Key]*hashBody)
 	err := OpenAllFile(filename, db)
 	if err!=nil {
 		return err
@@ -75,6 +77,16 @@ func (db *DB) OpenWithOptions(filename string, options DBOptions) error {
 
 func (db *DB) Close() error {
 	db.open = false
+	if err := db.activeDBFile.Close(); err != nil {
+		return err
+	}
+	if err := db.activeHintFile.Close(); err != nil {
+		return err
+	}
+	if err := db.infoFile.Close(); err != nil {
+		return err
+	}
+	// TODO: close read files.
 	return nil;
 }
 
@@ -137,28 +149,40 @@ func (db *DB) DeleteAsync(key Key, callback Callback) {
 }
 
 func (db *DB) write(packet *DataPacket) error {
-	// prepared for lock and unlock of io, useless for now
-	return WriteData(packet, db)
-	//fmt.Println(packet)
+	// prepared for lock of io, useless for now
+	hbody, err := WriteData(packet, db)
+	if err != nil {
+		return err
+	}
+	// unlock of io, useless for now
 
-	//TODO:
-	//
-	//f, err := os.OpenFile("/Users/mac/Desktop/golang/gocaskDB/abc.txt", os.O_RDWR, 0755)
-	//if err != nil {
-	//	fmt.Println(err)
-	//}
-	//b := packet.getBytes()
-	//n, err := f.Write(b)
-	//c := make([]byte, len(b))
-	//n, err = f.Read(c)
-	//fmt.Println(n, err, c)
-	//dat :=  bytesToData(c)
-	//fmt.Println(dat, dat.Check())
-	////f.Seek()
-	//f.Close()
+	// write hash table
+	if hbody.vsz == -1 {	// if delete
+		delete(db.hashtable, packet.key)
+	} else {	// if set
+		db.hashtable[packet.key] = hbody
+	}
+	//fmt.Println(db.hashtable)
 
 	return nil
 }
+
+//TODO:
+//
+//f, err := os.OpenFile("/Users/mac/Desktop/golang/gocaskDB/abc.txt", os.O_RDWR, 0755)
+//if err != nil {
+//	fmt.Println(err)
+//}
+//b := packet.getBytes()
+//n, err := f.Write(b)
+//c := make([]byte, len(b))
+//n, err = f.Read(c)
+//fmt.Println(n, err, c)
+//dat :=  bytesToData(c)
+//fmt.Println(dat, dat.Check())
+////f.Seek()
+//f.Close()
+
 
 func (db *DB) read(key Key) (value Value, err error) {
 	fmt.Println(key)
@@ -190,11 +214,3 @@ func (db *DB) runlock(key Key) {
 
 // Iterator?
 
-//func (db DB) read(key string) (value string, err error) {
-//
-//}
-//
-//func (db DB) write() {
-//	time.Now().UnixNano()
-//	crc32.ChecksumIEEE()
-//}
