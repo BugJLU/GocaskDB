@@ -94,11 +94,6 @@ func (datapkt *DataPacket)getBytes() [][]byte {
 	return result
 }
 
-//func (datapkt *DataPacket)getHintBytes(vpos int32) [][]byte {
-//	// TODO: hint bytes
-//	return nil
-//}
-
 func (datapkt *DataPacket)Check() bool {
 	data := datapkt.getDatapartBytes()
 	var b []byte

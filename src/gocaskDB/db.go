@@ -87,6 +87,11 @@ func (db *DB) Close() error {
 		return err
 	}
 	// TODO: close read files.
+	for i := range db.dbFiles{
+		if err:= db.dbFiles[i].Close(); err != nil {
+			return err
+		}
+	}
 	return nil;
 }
 
@@ -149,7 +154,8 @@ func (db *DB) DeleteAsync(key Key, callback Callback) {
 }
 
 func (db *DB) write(packet *DataPacket) error {
-	// prepared for lock of io, useless for now
+	// TODO: prepared for lock of io, useless for now ...?
+	// write files (.gcdb, .gch)
 	hbody, err := WriteData(packet, db)
 	if err != nil {
 		return err
@@ -162,7 +168,6 @@ func (db *DB) write(packet *DataPacket) error {
 	} else {	// if set
 		db.hashtable[packet.key] = hbody
 	}
-	//fmt.Println(db.hashtable)
 
 	return nil
 }
@@ -186,6 +191,7 @@ func (db *DB) write(packet *DataPacket) error {
 
 func (db *DB) read(key Key) (value Value, err error) {
 	fmt.Println(key)
+	//TODO:
 	return "", nil
 }
 

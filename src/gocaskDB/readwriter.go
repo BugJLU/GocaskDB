@@ -16,6 +16,8 @@ import (
 	"encoding/binary"
 	"util"
 	"strconv"
+	//"fmt"
+	"fmt"
 )
 
 type DBinfo struct {
@@ -55,16 +57,15 @@ func OpenAllFile(filename string, db *DB) error {
 	db.activeHintFile = fActHint
 
 	// open all db files to be read
-	rfiles := make([]string, len(db.dbinfo.Serial))
+	rfiles := make([]string, 0)
 	for i := range db.dbinfo.Serial{
 		rfiles = append(rfiles, getName(db.dbinfo.Serial[i], db)+".gcdb")
 	}
-	fRead, err := OpenAllReadDBFiles(rfiles)
-	db.dbFiles = fRead;
-
+	db.dbFiles, err = OpenAllReadDBFiles(rfiles)
 	return nil
 }
 
+// Called while a new db is creating.
 func CreateDBFiles(filename string, db *DB) error {
 	f, err := os.Create(filename)
 	if err != nil {
@@ -123,13 +124,17 @@ func WriteInfoFile(file *os.File, info *DBinfo) error {
 	return nil
 }
 
-// Open db files to read from.
+// Open all db files to read from.
 func OpenAllReadDBFiles(filename []string) ([]*os.File, error)  {
-	return nil, nil
-}
-
-func OpenReadDBFile(filename string) (*os.File, error) {
-	return nil, nil
+	fresult := make([]*os.File, 0)
+	for i := range filename{
+		if f, err := os.OpenFile(filename[i], os.O_RDONLY, 0755); err != nil {
+			return nil, err
+		} else {
+			fresult = append(fresult, f)
+		}
+	}
+	return fresult, nil
 }
 
 func WriteData(data *DataPacket, db *DB) (body *hashBody, errr error) {
@@ -193,6 +198,7 @@ func WriteData(data *DataPacket, db *DB) (body *hashBody, errr error) {
 	return hbody, nil
 }
 
+// Create or update act db files (.gcdb, .gch), update read list (dbFiles) too.
 func NewActFiles(db *DB) error {
 	defer db.dealingLock.Unlock()
 	if db.activeDBFile != nil {
@@ -202,20 +208,29 @@ func NewActFiles(db *DB) error {
 		db.activeHintFile.Close()
 	}
 	filename := getName(db.dbinfo.Active + 1, db)
+	// new db file
 	if adb, err := os.Create(filename+".gcdb"); err != nil {
 		return err
 	} else {
 		db.activeDBFile = adb
 	}
+	// new hint file
 	if aht, err := os.Create(filename+".gch"); err != nil {
 		return err
 	} else {
 		db.activeHintFile = aht
 	}
+	// add db file into read list
+	if rdb, err := os.OpenFile(filename+".gcdb", os.O_RDONLY, 0755); err != nil {
+		return err
+	} else {
+		db.dbFiles = append(db.dbFiles, rdb)
+	}
 	// update db info
 	db.dbinfo.Active += 1
 	db.dbinfo.Serial = append(db.dbinfo.Serial, db.dbinfo.Active)
 	WriteInfoFile(db.infoFile, db.dbinfo)
+	fmt.Println(db.dbFiles)
 	return nil
 }
 
