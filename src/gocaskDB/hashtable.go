@@ -3,7 +3,7 @@ package gocaskDB
 import "os"
 
 type hashBody struct {
-	file os.File
+	file *os.File
 	vsz int32
 	vpos int32
 	timestamp int64

@@ -28,7 +28,7 @@ type DB struct {
 	infoFile *os.File	// Main db file including db infos.
 	activeDBFile *os.File	// Current db file to write in.
 	activeHintFile *os.File	// Current hint file to write in.
-	dbFiles []*os.File	// All db files.
+	dbFiles map[int32]*os.File	// All db files.
 	dbPath string // Directory of db.
 	dbinfo *DBinfo
 	hashtable map[Key]*hashBody
@@ -86,7 +86,6 @@ func (db *DB) Close() error {
 	if err := db.infoFile.Close(); err != nil {
 		return err
 	}
-	// TODO: close read files.
 	for i := range db.dbFiles{
 		if err:= db.dbFiles[i].Close(); err != nil {
 			return err

@@ -17,7 +17,6 @@ import (
 	"util"
 	"strconv"
 	//"fmt"
-	"fmt"
 )
 
 type DBinfo struct {
@@ -57,11 +56,11 @@ func OpenAllFile(filename string, db *DB) error {
 	db.activeHintFile = fActHint
 
 	// open all db files to be read
-	rfiles := make([]string, 0)
-	for i := range db.dbinfo.Serial{
-		rfiles = append(rfiles, getName(db.dbinfo.Serial[i], db)+".gcdb")
-	}
-	db.dbFiles, err = OpenAllReadDBFiles(rfiles)
+	//rfiles := make([]string, 0)
+	//for i := range db.dbinfo.Serial{
+	//	rfiles = append(rfiles, getName(db.dbinfo.Serial[i], db)+".gcdb")
+	//}
+	db.dbFiles, err = OpenAllReadDBFiles(db.dbinfo.Serial, db)
 	return nil
 }
 
@@ -125,13 +124,13 @@ func WriteInfoFile(file *os.File, info *DBinfo) error {
 }
 
 // Open all db files to read from.
-func OpenAllReadDBFiles(filename []string) ([]*os.File, error)  {
-	fresult := make([]*os.File, 0)
-	for i := range filename{
-		if f, err := os.OpenFile(filename[i], os.O_RDONLY, 0755); err != nil {
+func OpenAllReadDBFiles(index []int32, db *DB) (map[int32]*os.File, error)  {
+	fresult := make(map[int32]*os.File)
+	for i := range index{
+		if f, err := os.OpenFile(getName(index[i], db)+".gcdb", os.O_RDONLY, 0755); err != nil {
 			return nil, err
 		} else {
-			fresult = append(fresult, f)
+			fresult[index[i]] = f;
 		}
 	}
 	return fresult, nil
@@ -173,7 +172,8 @@ func WriteData(data *DataPacket, db *DB) (body *hashBody, errr error) {
 	hbody.vpos = vpos
 	hbody.vsz = data.vsz
 	hbody.timestamp = data.timestamp
-	//hbody.file =
+	hbody.file = db.dbFiles[db.dbinfo.Active]
+	//TODO: hbody.file
 
 
 	/* 	If the size of active DB file >= file_max,
@@ -224,13 +224,13 @@ func NewActFiles(db *DB) error {
 	if rdb, err := os.OpenFile(filename+".gcdb", os.O_RDONLY, 0755); err != nil {
 		return err
 	} else {
-		db.dbFiles = append(db.dbFiles, rdb)
+		db.dbFiles[db.dbinfo.Active+1] = rdb
 	}
 	// update db info
 	db.dbinfo.Active += 1
 	db.dbinfo.Serial = append(db.dbinfo.Serial, db.dbinfo.Active)
 	WriteInfoFile(db.infoFile, db.dbinfo)
-	fmt.Println(db.dbFiles)
+	//fmt.Println(db.dbFiles)
 	return nil
 }
 
