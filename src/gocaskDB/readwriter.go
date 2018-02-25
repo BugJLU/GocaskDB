@@ -1,22 +1,15 @@
 package gocaskDB
 
 import (
-	//"os"
-	//"io"
-	//"bufio"
 	"os"
 	"io/ioutil"
 	"encoding/json"
-	//"fmt"
-	//"path/filepath"
 	"io"
-	//"fmt"
 	"path"
 	"strings"
 	"encoding/binary"
 	"util"
 	"strconv"
-	//"fmt"
 )
 
 type DBinfo struct {
@@ -173,7 +166,6 @@ func WriteData(data *DataPacket, db *DB) (body *hashBody, errr error) {
 	hbody.vsz = data.vsz
 	hbody.timestamp = data.timestamp
 	hbody.file = db.dbFiles[db.dbinfo.Active]
-	//TODO: hbody.file
 
 
 	/* 	If the size of active DB file >= file_max,
@@ -234,10 +226,20 @@ func NewActFiles(db *DB) error {
 	return nil
 }
 
-/* Useless */
-//// Open hint files to read from.
-//func OpenReadHintFiles(filename []string) ([]*os.File, error)  {
-//	return nil, nil
-//}
+func ReadValueFromFile(file *os.File, vpos int32, vsz int32) (Value, error) {
+	b := make([]byte, vsz)
+	_, err := file.ReadAt(b, int64(vpos))
+	if err != nil {
+		return Value(0), err
+	}
+	return Value(b), nil
+}
 
-
+func ReadRecordFromFile(file *os.File, vpos int32, ksz int32, vsz int32) (*DataPacket, error) {
+	b := make([]byte, 20+ksz+vsz)
+	_, err := file.ReadAt(b, int64(vpos-ksz-20))
+	if err != nil {
+		return nil, err
+	}
+	return bytesToData(b), err
+}

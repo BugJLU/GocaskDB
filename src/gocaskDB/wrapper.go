@@ -3,22 +3,7 @@ package gocaskDB
 import (
 	"util"
 	"encoding/binary"
-	"fmt"
 )
-
-//todo:test
-func TestWrap()  {
-	dp := wrap("abc我", "abcdefg", false)
-	fmt.Println(dp.getBytes())
-	//fmt.Println(dp.getHintBytes(0))
-	var bb []byte
-	t:=dp.getBytes()
-	for i := range t {
-		bb = append(bb, t[i]...)
-	}
-	dp1 := bytesToData(bb)
-	fmt.Println(dp1.Check())
-}
 
 // A packet of data to be stored in db file on disk.
 type DataPacket struct {

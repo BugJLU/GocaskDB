@@ -1,18 +1,19 @@
 package gocaskDB
 
 import (
-	"fmt"
 	"sync"
 	"os"
 	"errors"
-	//"util"
 	"path/filepath"
+	"util"
 )
 
 const (
 	// for error messages
 	ErrNotOpen = "Open database first. Use db.Open(). "
 	ErrNotClosed = "Database has been open, close first. Use db.Close()."
+	ErrNotFound = "Record not found."
+	ErrCheckFailed = "Data check failed, db file may be damaged."
 )
 
 const (
@@ -39,10 +40,10 @@ type DBOptions struct {
 	file_max int32	// 10MB by default, no more than 2GB
 	key_max int32	// 1KB by default
 	val_max int32	// 65536B by default
-
+	read_check bool	// false by default
 }
 
-var defaultOptions = DBOptions{ 10<<20, 1<<10, 1<<16 }
+var defaultOptions = DBOptions{ 10<<20, 1<<10, 1<<16, false }
 
 type Key string;
 type Value string;
@@ -96,10 +97,13 @@ func (db *DB) Close() error {
 
 func (db *DB) Get(key Key) (value Value, err error) {
 	if !db.open {
-		return "", errors.New(ErrNotOpen)
+		return Value(0), errors.New(ErrNotOpen)
 	}
 	db.rlock(key)
 	defer db.runlock(key)
+	if db.options.read_check {
+		return db.readAndCheck(key)
+	}
 	return db.read(key);
 }
 
@@ -107,7 +111,7 @@ func (db *DB) Set(key Key, value Value) error {
 	if !db.open {
 		return errors.New(ErrNotOpen)
 	}
-	data := wrap(key, value, false)
+	data := wrap(key, value, false)	// wrap data into DataPackage
 	db.lock(key)
 	defer db.unlock(key)
 	return db.write(data);
@@ -117,7 +121,7 @@ func (db *DB) Delete(key Key) error {
 	if !db.open {
 		return errors.New(ErrNotOpen)
 	}
-	data := wrap(key, "", true)
+	data := wrap(key, Value(0), true)
 	db.lock(key)
 	defer db.unlock(key)
 	return db.write(data);
@@ -141,57 +145,68 @@ func (db *DB) GetAsync(key Key, callback Callback) {
 func (db *DB) SetAsync(key Key, value Value, callback Callback) {
 	go func() {
 		err := db.Set(key, value);
-		callback(err, "");
+		callback(err, Value(0));
 	}()
 }
 
 func (db *DB) DeleteAsync(key Key, callback Callback) {
 	go func() {
 		err := db.Delete(key);
-		callback(err, "");
+		callback(err, Value(0));
 	}()
 }
 
 func (db *DB) write(packet *DataPacket) error {
 	// TODO: prepared for lock of io, useless for now ...?
+
 	// write files (.gcdb, .gch)
 	hbody, err := WriteData(packet, db)
 	if err != nil {
 		return err
 	}
+
 	// unlock of io, useless for now
 
 	// write hash table
-	if hbody.vsz == -1 {	// if delete
-		delete(db.hashtable, packet.key)
-	} else {	// if set
-		db.hashtable[packet.key] = hbody
-	}
+	WriteHashTable(packet.key, hbody, db)
 
 	return nil
 }
 
-//TODO:
-//
-//f, err := os.OpenFile("/Users/mac/Desktop/golang/gocaskDB/abc.txt", os.O_RDWR, 0755)
-//if err != nil {
-//	fmt.Println(err)
-//}
-//b := packet.getBytes()
-//n, err := f.Write(b)
-//c := make([]byte, len(b))
-//n, err = f.Read(c)
-//fmt.Println(n, err, c)
-//dat :=  bytesToData(c)
-//fmt.Println(dat, dat.Check())
-////f.Seek()
-//f.Close()
 
+func (db *DB) read(key Key) (Value, error) {
+	// read hashtable to get value position
+	hbody, ok := db.hashtable[key]
+	if !ok {	// If key does not exist or has been removed.
+		return Value(0), errors.New(ErrNotFound)
+	}
 
-func (db *DB) read(key Key) (value Value, err error) {
-	fmt.Println(key)
-	//TODO:
-	return "", nil
+	// read value
+	value, err := ReadValueFromFile(hbody.file, hbody.vpos, hbody.vsz)
+	if err != nil {
+		return Value(0), err
+	}
+	return value, nil
+}
+
+func (db *DB) readAndCheck(key Key) (Value, error) {
+	// read hashtable to get value position
+	hbody, ok := db.hashtable[key]
+	if !ok {	// If key does not exist or has been removed.
+		return Value(0), errors.New(ErrNotFound)
+	}
+
+	// read record (DataPacket)
+	dp, err := ReadRecordFromFile(hbody.file, hbody.vpos, util.Sizeof(string(key)), hbody.vsz)
+	if err != nil {
+		return Value(0), err
+	}
+
+	// check record
+	if !dp.Check() {
+		return dp.value, errors.New(ErrCheckFailed)
+	}
+	return dp.value, nil
 }
 
 func (db *DB) lock(key Key) {
