@@ -10,7 +10,7 @@ import (
 	//"os"
 )
 
-func main()  {
+func main() {
 	//var db gocaskDB.DB;
 	//db.Open("")
 	//db.Set("asdfasfss","aaadaffevdsafea");
@@ -31,6 +31,5 @@ func main()  {
 	//
 	//fmt.Println(1<<10, 1<<20, 1<<16)
 	gocaskDB.TestWrap()
-
 
 }

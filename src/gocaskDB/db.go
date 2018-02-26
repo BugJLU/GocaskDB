@@ -1,18 +1,18 @@
 package gocaskDB
 
 import (
-	"sync"
-	"os"
 	"errors"
+	"os"
 	"path/filepath"
+	"sync"
 	"util"
 )
 
 const (
 	// for error messages
-	ErrNotOpen = "Open database first. Use db.Open(). "
-	ErrNotClosed = "Database has been open, close first. Use db.Close()."
-	ErrNotFound = "Record not found."
+	ErrNotOpen     = "Open database first. Use db.Open(). "
+	ErrNotClosed   = "Database has been open, close first. Use db.Close()."
+	ErrNotFound    = "Record not found."
 	ErrCheckFailed = "Data check failed, db file may be damaged."
 )
 
@@ -23,34 +23,34 @@ const (
 )
 
 type DB struct {
-	options DBOptions
-	rwlock *sync.RWMutex
-	dealingLock *sync.Mutex
-	infoFile *os.File	// Main db file including db infos.
-	activeDBFile *os.File	// Current db file to write in.
-	activeHintFile *os.File	// Current hint file to write in.
-	dbFiles map[int32]*os.File	// All db files.
-	dbPath string // Directory of db.
-	dbinfo *DBinfo
-	hashtable map[Key]*hashBody
-	open bool
+	options        DBOptions
+	rwlock         *sync.RWMutex
+	dealingLock    *sync.Mutex
+	infoFile       *os.File           // Main db file including db infos.
+	activeDBFile   *os.File           // Current db file to write in.
+	activeHintFile *os.File           // Current hint file to write in.
+	dbFiles        map[int32]*os.File // All db files.
+	dbPath         string             // Directory of db.
+	dbinfo         *DBinfo
+	hashtable      map[Key]*hashBody
+	open           bool
 }
 
 type DBOptions struct {
-	file_max int32	// 10MB by default, no more than 2GB
-	key_max int32	// 1KB by default
-	val_max int32	// 65536B by default
-	read_check bool	// false by default
+	file_max   int32 // 10MB by default, no more than 2GB
+	key_max    int32 // 1KB by default
+	val_max    int32 // 65536B by default
+	read_check bool  // false by default
 }
 
-var defaultOptions = DBOptions{ 10<<20, 1<<10, 1<<16, false }
+var defaultOptions = DBOptions{10 << 20, 1 << 10, 1 << 16, false}
 
-type Key string;
-type Value string;
+type Key string
+type Value string
 
 // unused
 type Record struct {
-	key Key;
+	key   Key
 	value Value
 }
 
@@ -66,13 +66,16 @@ func (db *DB) OpenWithOptions(filename string, options DBOptions) error {
 	db.rwlock = new(sync.RWMutex)
 	db.dealingLock = new(sync.Mutex)
 	db.dbPath = filepath.Dir(filename)
-	//db.hashtable = make(map[Key]*hashBody)
 	err := OpenAllFile(filename, db)
-	if err!=nil {
+	if err != nil {
 		return err
 	}
-	db.hashtable = RebuildHashFromHint(db)
+	db.hashtable, err = RebuildHashFromHint(db)
+	if err != nil {
+		return err
+	}
 	db.open = true
+	//fmt.Println(db.hashtable)
 	return nil
 }
 
@@ -87,12 +90,12 @@ func (db *DB) Close() error {
 	if err := db.infoFile.Close(); err != nil {
 		return err
 	}
-	for i := range db.dbFiles{
-		if err:= db.dbFiles[i].Close(); err != nil {
+	for i := range db.dbFiles {
+		if err := db.dbFiles[i].Close(); err != nil {
 			return err
 		}
 	}
-	return nil;
+	return nil
 }
 
 func (db *DB) Get(key Key) (value Value, err error) {
@@ -104,17 +107,17 @@ func (db *DB) Get(key Key) (value Value, err error) {
 	if db.options.read_check {
 		return db.readAndCheck(key)
 	}
-	return db.read(key);
+	return db.read(key)
 }
 
 func (db *DB) Set(key Key, value Value) error {
 	if !db.open {
 		return errors.New(ErrNotOpen)
 	}
-	data := wrap(key, value, false)	// wrap data into DataPackage
+	data := wrap(key, value, false) // wrap data into DataPackage
 	db.lock(key)
 	defer db.unlock(key)
-	return db.write(data);
+	return db.write(data)
 }
 
 func (db *DB) Delete(key Key) error {
@@ -124,7 +127,7 @@ func (db *DB) Delete(key Key) error {
 	data := wrap(key, Value(0), true)
 	db.lock(key)
 	defer db.unlock(key)
-	return db.write(data);
+	return db.write(data)
 }
 
 /* 	Type of callback function for async get/set/delete,
@@ -133,26 +136,26 @@ func (db *DB) Delete(key Key) error {
  *	the value of a query will be in (value) if the
  *	callback is for a Get operation.
  */
-type Callback func(err error, value Value);
+type Callback func(err error, value Value)
 
 func (db *DB) GetAsync(key Key, callback Callback) {
 	go func() {
-		val, err := db.Get(key);
-		callback(err, val);
+		val, err := db.Get(key)
+		callback(err, val)
 	}()
 }
 
 func (db *DB) SetAsync(key Key, value Value, callback Callback) {
 	go func() {
-		err := db.Set(key, value);
-		callback(err, Value(0));
+		err := db.Set(key, value)
+		callback(err, Value(0))
 	}()
 }
 
 func (db *DB) DeleteAsync(key Key, callback Callback) {
 	go func() {
-		err := db.Delete(key);
-		callback(err, Value(0));
+		err := db.Delete(key)
+		callback(err, Value(0))
 	}()
 }
 
@@ -173,11 +176,10 @@ func (db *DB) write(packet *DataPacket) error {
 	return nil
 }
 
-
 func (db *DB) read(key Key) (Value, error) {
 	// read hashtable to get value position
 	hbody, ok := db.hashtable[key]
-	if !ok {	// If key does not exist or has been removed.
+	if !ok { // If key does not exist or has been removed.
 		return Value(0), errors.New(ErrNotFound)
 	}
 
@@ -192,7 +194,7 @@ func (db *DB) read(key Key) (Value, error) {
 func (db *DB) readAndCheck(key Key) (Value, error) {
 	// read hashtable to get value position
 	hbody, ok := db.hashtable[key]
-	if !ok {	// If key does not exist or has been removed.
+	if !ok { // If key does not exist or has been removed.
 		return Value(0), errors.New(ErrNotFound)
 	}
 
@@ -233,4 +235,3 @@ func (db *DB) runlock(key Key) {
 }
 
 // Iterator?
-

@@ -1,11 +1,12 @@
 package main
 
 import (
+	_ "fmt"
 	"gocaskDB"
 	"fmt"
 )
 
-func main()  {
+func main() {
 	db := &gocaskDB.DB{}
 	db.Open("/Users/mac/Desktop/golang/gocaskDB/testdb/myadb.json")
 	defer db.Close()
@@ -17,5 +18,6 @@ func main()  {
 	fmt.Println(db.Get("asdf"))
 	db.Delete("zxcv")
 	fmt.Println(db.Get("zxcv"))
-	//db.Delete("zxcv")
+	db.Delete("zxcv")
+	fmt.Println(db.Get("asd123jkl0"))
 }

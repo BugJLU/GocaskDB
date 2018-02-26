@@ -1,8 +1,8 @@
 package main
 
 import (
-	"gocaskDB"
 	"fmt"
+	"gocaskDB"
 	"util"
 )
 
@@ -35,6 +35,5 @@ func main() {
 	t2 := util.UnixNano()
 
 	fmt.Println(float32(t2-t1)/1000/1000, "ms")
-
 
 }

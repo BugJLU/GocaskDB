@@ -1,8 +1,8 @@
 package gocaskDB
 
 import (
-	"util"
 	"encoding/binary"
+	"util"
 )
 
 // A packet of data to be stored in db file on disk.
@@ -27,7 +27,7 @@ func wrap(key Key, value Value, del bool) *DataPacket {
 	if del {
 		datapkt.vsz = -1
 	}
-	datapart := datapkt.getDatapartBytes();
+	datapart := datapkt.getDatapartBytes()
 	var bytes []byte
 	for b := range datapart {
 		bytes = append(bytes, datapart[b]...)
@@ -55,7 +55,7 @@ func bytesToData(bytes []byte) *DataPacket {
 	return data
 }
 
-func (datapkt *DataPacket)getDatapartBytes() [][]byte {
+func (datapkt *DataPacket) getDatapartBytes() [][]byte {
 	var tmp []byte
 	var datapart [][]byte
 	tmp = util.ToBytes(datapkt.timestamp)
@@ -70,7 +70,7 @@ func (datapkt *DataPacket)getDatapartBytes() [][]byte {
 }
 
 //	crc	| tstmp	|  ksz	|  vsz	|  key	|  val
-func (datapkt *DataPacket)getBytes() [][]byte {
+func (datapkt *DataPacket) getBytes() [][]byte {
 	dpb := datapkt.getDatapartBytes()
 	crcb := util.ToBytes(datapkt.crc)
 	result := make([][]byte, 1, 1)
@@ -79,7 +79,7 @@ func (datapkt *DataPacket)getBytes() [][]byte {
 	return result
 }
 
-func (datapkt *DataPacket)Check() bool {
+func (datapkt *DataPacket) Check() bool {
 	data := datapkt.getDatapartBytes()
 	var b []byte
 	for i := range data {
