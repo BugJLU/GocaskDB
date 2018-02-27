@@ -2,12 +2,7 @@ package main
 
 import (
 	"gocaskDB"
-	//"fmt"
-	//"encoding/binary"
-	//"util"
-	//"unsafe"
-	//"os"
-	//"os"
+
 )
 
 func main() {
@@ -30,6 +25,6 @@ func main() {
 	////var p uintptr
 	//
 	//fmt.Println(1<<10, 1<<20, 1<<16)
-	gocaskDB.TestWrap()
+	gocaskDB.TmpT()
 
 }

@@ -2,7 +2,6 @@ package gocaskDB
 
 import (
 	"errors"
-	"os"
 	"path/filepath"
 	"sync"
 	"util"
@@ -25,25 +24,34 @@ const (
 type DB struct {
 	options        DBOptions
 	rwlock         *sync.RWMutex
-	dealingLock    *sync.Mutex
-	infoFile       *os.File           // Main db file including db infos.
-	activeDBFile   *os.File           // Current db file to write in.
-	activeHintFile *os.File           // Current hint file to write in.
-	dbFiles        map[int32]*os.File // All db files.
-	dbPath         string             // Directory of db.
-	dbinfo         *DBinfo
+
+	//infoFile       *os.File           // Main db file including db infos.
+	//activeDBFile   *os.File           // Current db file to write in.
+	//activeHintFile *os.File           // Current hint file to write in.
+	//dbFiles        map[int32]*os.File // All db files.
+	//dbPath         string             // Directory of db.
+	//dbinfo         *DBinfo
+	fileMgr *FileMgr
 	hashtable      map[Key]*hashBody
 	open           bool
 }
 
 type DBOptions struct {
-	file_max   int32 // 10MB by default, no more than 2GB
-	key_max    int32 // 1KB by default
-	val_max    int32 // 65536B by default
-	read_check bool  // false by default
+	FILE_MAX   int32 // 10MB by default, no more than 2GB
+	KEY_MAX    int32 // 1KB by default
+	VAL_MAX    int32 // 65536B by default
+	READ_CHECK bool  // false by default
+	BUFFER_MAX int32 // 1MB by default
+	CACHE_MAX  int32 // 1MB by default
 }
 
-var defaultOptions = DBOptions{10 << 20, 1 << 10, 1 << 16, false}
+var defaultOptions = DBOptions{
+	10 << 20,
+	1 << 10,
+	1 << 16,
+	false,
+	1 << 20,
+	1 << 20}
 
 type Key string
 type Value string
@@ -52,6 +60,10 @@ type Value string
 type Record struct {
 	key   Key
 	value Value
+}
+
+func GetDefaultOption() DBOptions {
+	return defaultOptions
 }
 
 func (db *DB) Open(filename string) error {
@@ -64,13 +76,14 @@ func (db *DB) OpenWithOptions(filename string, options DBOptions) error {
 	}
 	db.options = options
 	db.rwlock = new(sync.RWMutex)
-	db.dealingLock = new(sync.Mutex)
-	db.dbPath = filepath.Dir(filename)
-	err := OpenAllFile(filename, db)
+	db.fileMgr = new(FileMgr)
+	db.fileMgr.dbPath = filepath.Dir(filename)
+	db.fileMgr.dealingNewLock = new(sync.Mutex)
+	err := db.fileMgr.OpenAllFile(filename)
 	if err != nil {
 		return err
 	}
-	db.hashtable, err = RebuildHashFromHint(db)
+	db.hashtable, err = db.fileMgr.RebuildHashFromHint()
 	if err != nil {
 		return err
 	}
@@ -81,19 +94,8 @@ func (db *DB) OpenWithOptions(filename string, options DBOptions) error {
 
 func (db *DB) Close() error {
 	db.open = false
-	if err := db.activeDBFile.Close(); err != nil {
+	if err := db.fileMgr.CloseAll(); err != nil {
 		return err
-	}
-	if err := db.activeHintFile.Close(); err != nil {
-		return err
-	}
-	if err := db.infoFile.Close(); err != nil {
-		return err
-	}
-	for i := range db.dbFiles {
-		if err := db.dbFiles[i].Close(); err != nil {
-			return err
-		}
 	}
 	return nil
 }
@@ -104,7 +106,7 @@ func (db *DB) Get(key Key) (value Value, err error) {
 	}
 	db.rlock(key)
 	defer db.runlock(key)
-	if db.options.read_check {
+	if db.options.READ_CHECK {
 		return db.readAndCheck(key)
 	}
 	return db.read(key)
@@ -163,7 +165,7 @@ func (db *DB) write(packet *DataPacket) error {
 	// TODO: prepared for lock of io, useless for now ...?
 
 	// write files (.gcdb, .gch)
-	hbody, err := WriteData(packet, db)
+	hbody, err := db.fileMgr.WriteDataToFile(packet, db.options)
 	if err != nil {
 		return err
 	}
@@ -171,20 +173,20 @@ func (db *DB) write(packet *DataPacket) error {
 	// unlock of io, useless for now
 
 	// write hash table
-	WriteHashTable(packet.key, hbody, db)
+	db.WriteHashTable(packet.key, hbody)
 
 	return nil
 }
 
 func (db *DB) read(key Key) (Value, error) {
 	// read hashtable to get value position
-	hbody, ok := db.hashtable[key]
-	if !ok { // If key does not exist or has been removed.
+	hbody, ok := db.ReadHashTable(key)
+	if !ok {
 		return Value(0), errors.New(ErrNotFound)
 	}
 
 	// read value
-	value, err := ReadValueFromFile(hbody.file, hbody.vpos, hbody.vsz)
+	value, err := db.fileMgr.ReadValueFromFile(hbody.fileno, hbody.vpos, hbody.vsz)
 	if err != nil {
 		return Value(0), err
 	}
@@ -193,13 +195,13 @@ func (db *DB) read(key Key) (Value, error) {
 
 func (db *DB) readAndCheck(key Key) (Value, error) {
 	// read hashtable to get value position
-	hbody, ok := db.hashtable[key]
-	if !ok { // If key does not exist or has been removed.
+	hbody, ok := db.ReadHashTable(key)
+	if !ok {
 		return Value(0), errors.New(ErrNotFound)
 	}
 
 	// read record (DataPacket)
-	dp, err := ReadRecordFromFile(hbody.file, hbody.vpos, util.Sizeof(string(key)), hbody.vsz)
+	dp, err := db.fileMgr.ReadRecordFromFile(hbody.fileno, hbody.vpos, util.Sizeof(string(key)), hbody.vsz)
 	if err != nil {
 		return Value(0), err
 	}
@@ -213,13 +215,6 @@ func (db *DB) readAndCheck(key Key) (Value, error) {
 
 func (db *DB) lock(key Key) {
 	db.rwlock.Lock()
-
-	/* 	Lock then unlock the dealingLock in
-	 *	case that a goroutine is running to
-	 *	create new active db and hint files.
-	 */
-	db.dealingLock.Lock()
-	db.dealingLock.Unlock()
 }
 
 func (db *DB) unlock(key Key) {

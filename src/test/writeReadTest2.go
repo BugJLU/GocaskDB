@@ -1,10 +1,10 @@
 package main
 
 import (
-	"gocaskDB"
 	"fmt"
-	"strconv"
+	"gocaskDB"
 	"math/rand"
+	"strconv"
 )
 
 func main() {
@@ -41,7 +41,7 @@ func main() {
 	db.Close()
 
 	db.Open("/Users/mac/Desktop/golang/gocaskDB/testdb/test1db.json")
-	for i:=0; i < 50; i++ {
+	for i := 0; i < 50; i++ {
 		if _, ok := changes[i]; ok {
 			fmt.Print("* ")
 		}

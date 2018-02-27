@@ -1,8 +1,8 @@
 package gocaskDB
 
 import (
-	"os"
 	"io"
+	"os"
 )
 
 type Iterator interface {
@@ -11,10 +11,10 @@ type Iterator interface {
 
 type HintData struct {
 	timestamp int64
-	ksz int32
-	vsz int32
-	vpos int32
-	key Key
+	ksz       int32
+	vsz       int32
+	vpos      int32
+	key       Key
 }
 
 type HintIterator struct {
@@ -28,7 +28,7 @@ func GetHintIterator(hintFile *os.File) *HintIterator {
 }
 
 func (hi *HintIterator) Next() (data interface{}, ok bool) {
-	hdata, err := ReadRecordFromHint(hi.hintFile)
+	hdata, err := readRecordFromHint(hi.hintFile)
 	if err != nil {
 		return nil, false
 	}

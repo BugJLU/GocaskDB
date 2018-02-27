@@ -1,33 +1,41 @@
 package main
 
 import (
-	"gocaskDB"
-	"util"
 	"fmt"
-	"strconv"
+	"gocaskDB"
 	"math/rand"
+	"strconv"
+	"util"
 )
 
-const AMOUNT = 100000
+const AMOUNT = 500000
 
 func main() {
 	db := &gocaskDB.DB{}
-	db.Open("/Users/mac/Desktop/golang/gocaskDB/testdb/testdb.json")
+	option := gocaskDB.GetDefaultOption()
+	option.FILE_MAX = 128 << 20 // 128MB
+	//option.READ_CHECK = true
+	db.OpenWithOptions("/Users/mac/Desktop/golang/gocaskDB/testdb/testdb.json", option)
 	defer db.Close()
 
-	t1 := util.UnixNano()
-	for i := 0; i < AMOUNT; i++ {
-		istr := strconv.Itoa(i)
-		db.Set(gocaskDB.Key(istr),
-			gocaskDB.Value(istr+"asdfgzxcvnuedjszqiklwerxsqi175'[z056=`z/eklzr42naz"))
-	}
-	t2 := util.UnixNano()
-	fmt.Println("Write", AMOUNT, "record(s) takes:", float32(t2-t1)/1000/1000, "ms")
+	//t1 := util.UnixNano()
+	//for i := 0; i < AMOUNT; i++ {
+	//	istr := strconv.Itoa(i)
+	//	db.Set(gocaskDB.Key(istr),
+	//		gocaskDB.Value(istr+"asdfgzxcvnuedjszqiklwerxsqi175'[z056=`z/eklzr42nazasdfgzxcvnuedjszqiklwerxsqi175'[z056=`z/eklzr42nazasdfgzxcvnuedjszqiklwerxsqi175'[z056=`z/eklzr42nazasdfgzxcvnuedjszqiklwerxsqi175'[z056=`z/eklzr42nazasdfgzxcvnuedjszqiklwerxsqi175'[z056=`z/eklzr42nazasdfgzxcvnuedjszqiklwerxsqi175'[z056=`z/eklzr42nazasdfgzxcvnuedjszqiklwerxsqi175'[z056=`z/eklzr42nazasdfgzxcvnuedjszqiklwerxsqi175'[z056=`z/eklzr42nazasdfgzxcvnuedjszqiklwerxsqi175'[z056=`z/eklzr42nazasdfgzxcvnuedjszqiklwerxsqi175'[z056=`z/eklzr42naz"))
+	//}
+	//t2 := util.UnixNano()
+	//fmt.Println("Write", AMOUNT, "record(s) takes:", float32(t2-t1)/1000/1000, "ms")
 
-	t3 := util.UnixNano()
-	for i := 0; i < 10; i++ {
+	sli := make([]string, 0)
+	for i := 0; i < AMOUNT; i++ {
 		key := strconv.Itoa(rand.Intn(AMOUNT))
-		db.Get(gocaskDB.Key(key))
+		sli = append(sli, key)
+	}
+	t3 := util.UnixNano()
+	for i := 0; i < AMOUNT; i++ {
+		//key := sli[i]
+		db.Get(gocaskDB.Key(sli[i]))
 		//fmt.Print(key+" ")
 		//fmt.Println(db.Get(gocaskDB.Key(key)))
 	}
